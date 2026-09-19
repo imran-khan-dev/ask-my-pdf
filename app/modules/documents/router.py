@@ -2,28 +2,30 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from app.core.database import get_db
+from app.modules.documents.model import Document
+from app.modules.documents.schemas import (
+    DocumentCreate,
+    DocumentResponse,
+)
+
 
 router = APIRouter()
 
-
-class DocumentCreate(BaseModel):
-    title: str = Field(min_length=1, max_length=100)
-    description: str | None = None
-
-
-class DocumentResponse(BaseModel):
-    id: int
-    title: str
-    description: str | None = None
-
-
 @router.post("/", response_model=DocumentResponse)
-def create_document(document: DocumentCreate):
-    return {
-        "id": 1,
-        "title": document.title,
-        "description": document.description
-    }
+def create_document(
+    document: DocumentCreate,
+    db: Session = Depends(get_db),
+):
+    new_document = Document(
+        filename=document.filename,
+        storage_path=document.storage_path,
+    )
+
+    db.add(new_document)
+    db.commit()
+    db.refresh(new_document)
+
+    return new_document
 
 def get_current_user():
     return {
@@ -45,11 +47,11 @@ def get_documents(q: str, limit: int = 10):
         "limit": limit
     }
 
-@router.get("/")
+@router.get("/", response_model=list[DocumentResponse])
 def get_documents(db: Session = Depends(get_db)):
-    return {
-        "message": "Database dependency is working"
-    }
+    documents = db.query(Document).all()
+
+    return documents
 
 @router.get("/{document_id}", response_model=DocumentResponse)
 def get_document(document_id: int):

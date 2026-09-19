@@ -1,13 +1,17 @@
-from sqlalchemy import Column, Integer, String, DateTime
-from sqlalchemy.sql import func
-
-from app.core.database import Base
+from pydantic import BaseModel
+from datetime import datetime
 
 
-class Document(Base):
-    __tablename__ = "documents"
+class DocumentResponse(BaseModel):
+    id: int
+    filename: str
+    storage_path: str
+    created_at: datetime
 
-    id = Column(Integer, primary_key=True, index=True)
-    filename = Column(String, nullable=False)
-    storage_path = Column(String, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    model_config = {
+        "from_attributes": True
+    }
+
+class DocumentCreate(BaseModel):
+    filename: str
+    storage_path: str
