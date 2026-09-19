@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
 router = APIRouter()
@@ -23,6 +23,18 @@ def create_document(document: DocumentCreate):
         "description": document.description
     }
 
+def get_current_user():
+    return {
+        "id": 1,
+        "name": "Imran"
+    }
+
+
+@router.get("/me")
+def get_me(user = Depends(get_current_user)):
+    return {
+        "user": user
+    }
 
 @router.get("/search")
 def get_documents(q: str, limit: int = 10):
@@ -39,3 +51,4 @@ def get_document(document_id: int):
         "title": "My PDF",
         "description": "FastAPI notes"
     }
+
