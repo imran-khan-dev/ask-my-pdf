@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
+from app.core.database import get_db
 
 router = APIRouter()
 
@@ -43,6 +45,11 @@ def get_documents(q: str, limit: int = 10):
         "limit": limit
     }
 
+@router.get("/")
+def get_documents(db: Session = Depends(get_db)):
+    return {
+        "message": "Database dependency is working"
+    }
 
 @router.get("/{document_id}", response_model=DocumentResponse)
 def get_document(document_id: int):
