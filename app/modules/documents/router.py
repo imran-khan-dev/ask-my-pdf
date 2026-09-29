@@ -1,24 +1,28 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends,  UploadFile, File
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.modules.documents.model import Document
 from app.modules.documents.schemas import (
-    DocumentCreate,
     DocumentResponse,
 )
 
-
 router = APIRouter()
 
-@router.post("/", response_model=DocumentResponse)
-def create_document(
-    document: DocumentCreate,
+@router.post("/upload", response_model=DocumentResponse)
+async def upload_document(
+    file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
+    file_path = f"uploads/{file.filename}"
+
+    with open(file_path, "wb") as buffer:
+        content = await file.read()
+        buffer.write(content)
+
     new_document = Document(
-        filename=document.filename,
-        storage_path=document.storage_path,
+        filename=file.filename,
+        storage_path=file_path,
     )
 
     db.add(new_document)
@@ -32,7 +36,6 @@ def get_current_user():
         "id": 1,
         "name": "Imran"
     }
-
 
 @router.get("/me")
 def get_me(user = Depends(get_current_user)):
