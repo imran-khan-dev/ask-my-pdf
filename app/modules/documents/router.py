@@ -30,6 +30,7 @@ async def upload_document(
     new_document = Document(
         filename=file.filename,
         storage_path=file_path,
+        extracted_text=extracted_text,
     )
 
     db.add(new_document)

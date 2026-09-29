@@ -15,3 +15,6 @@ app.include_router(
 )
 
 # uvicorn main:app --reload
+# alembic revision --autogenerate -m "add extracted text to documents"
+# alembic upgrade head
+
