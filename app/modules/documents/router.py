@@ -6,6 +6,7 @@ from app.modules.documents.model import Document
 from app.modules.documents.schemas import (
     DocumentResponse,
 )
+from app.modules.documents.pdf import extract_text
 
 router = APIRouter()
 
@@ -19,6 +20,12 @@ async def upload_document(
     with open(file_path, "wb") as buffer:
         content = await file.read()
         buffer.write(content)
+
+    extracted_text = extract_text(file_path)
+
+    print("========== EXTRACTED TEXT ==========")
+    print(extracted_text)
+    print("====================================")
 
     new_document = Document(
         filename=file.filename,

@@ -10,4 +10,5 @@ class Document(Base):
     id = Column(Integer, primary_key=True, index=True)
     filename = Column(String, nullable=False)
     storage_path = Column(String, nullable=False)
+    extracted_text = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
