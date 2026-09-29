@@ -7,6 +7,8 @@ from app.modules.documents.schemas import (
     DocumentResponse,
 )
 from app.modules.documents.pdf import extract_text
+from app.modules.documents.chunk_model import DocumentChunk
+from app.modules.documents.chunking import chunk_text
 
 router = APIRouter()
 
@@ -23,10 +25,6 @@ async def upload_document(
 
     extracted_text = extract_text(file_path)
 
-    print("========== EXTRACTED TEXT ==========")
-    print(extracted_text)
-    print("====================================")
-
     new_document = Document(
         filename=file.filename,
         storage_path=file_path,
@@ -36,6 +34,19 @@ async def upload_document(
     db.add(new_document)
     db.commit()
     db.refresh(new_document)
+
+    chunks = chunk_text(extracted_text)
+
+    for index, chunk in enumerate(chunks):
+        document_chunk = DocumentChunk(
+            document_id=new_document.id,
+            chunk_index=index,
+            content=chunk,
+        )
+
+        db.add(document_chunk)
+
+    db.commit()
 
     return new_document
 
