@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, Text, ForeignKey
-
+from pgvector.sqlalchemy import VECTOR
 from app.core.database import Base
 
 
@@ -17,3 +17,5 @@ class DocumentChunk(Base):
     chunk_index = Column(Integer, nullable=False)
 
     content = Column(Text, nullable=False)
+
+    embedding = Column(VECTOR(1536), nullable=True)
