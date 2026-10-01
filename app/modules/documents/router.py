@@ -9,6 +9,7 @@ from app.modules.documents.schemas import (
 from app.modules.documents.pdf import extract_text
 from app.modules.documents.chunk_model import DocumentChunk
 from app.modules.documents.chunking import chunk_text
+from app.modules.documents.embedding import generate_embedding
 
 router = APIRouter()
 
@@ -38,10 +39,13 @@ async def upload_document(
     chunks = chunk_text(extracted_text)
 
     for index, chunk in enumerate(chunks):
+        embedding = generate_embedding(chunk)
+
         document_chunk = DocumentChunk(
             document_id=new_document.id,
             chunk_index=index,
             content=chunk,
+            embedding=embedding
         )
 
         db.add(document_chunk)
