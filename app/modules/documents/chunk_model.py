@@ -18,4 +18,4 @@ class DocumentChunk(Base):
 
     content = Column(Text, nullable=False)
 
-    embedding = Column(VECTOR(1536), nullable=True)
+    embedding = Column(VECTOR(384), nullable=True)
