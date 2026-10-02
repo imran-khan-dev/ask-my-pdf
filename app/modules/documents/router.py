@@ -11,6 +11,7 @@ from app.modules.documents.chunk_model import DocumentChunk
 from app.modules.documents.chunking import chunk_text
 from app.modules.documents.embedding import generate_embedding
 from app.modules.documents.search import search_similar_chunks
+from app.modules.documents.llm import generate_answer
 
 router = APIRouter()
 
@@ -74,6 +75,69 @@ def get_me(user = Depends(get_current_user)):
 #         "query": q,
 #         "limit": limit
 #     }
+
+# @router.get("/ask")
+# def ask_document(
+#     q: str,
+#     db: Session = Depends(get_db),
+# ):
+#     # 1. Convert the question into an embedding
+#     query_embedding = generate_embedding(q)
+
+#     # 2. Find the most relevant chunks
+#     results = search_similar_chunks(
+#         db=db,
+#         query_embedding=query_embedding,
+#         limit=5,
+#     )
+
+#     # 3. Extract only the text from each chunk
+#     chunks = []
+
+#     for chunk, distance in results:
+#         chunks.append(chunk.content)
+
+#     # 4. Send the question + retrieved chunks to Qwen
+#     answer = generate_answer(
+#         question=q,
+#         chunks=chunks,
+#     )
+
+#     return {
+#         "question": q,
+#         "answer": answer,
+#     }
+
+@router.get("/{document_id}/ask")
+def ask_document(
+    document_id: int,
+    q: str,
+    db: Session = Depends(get_db),
+):
+    query_embedding = generate_embedding(q)
+
+    results = search_similar_chunks(
+        db=db,
+        query_embedding=query_embedding,
+        document_id=document_id,
+        limit=5,
+    )
+
+    chunks = []
+
+    for chunk, distance in results:
+        chunks.append(chunk.content)
+
+    answer = generate_answer(
+        question=q,
+        chunks=chunks,
+    )
+
+    return {
+        "document_id": document_id,
+        "question": q,
+        "answer": answer,
+    }
 
 @router.get("/search")
 def search_documents(
