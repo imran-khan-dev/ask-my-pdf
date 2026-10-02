@@ -10,6 +10,7 @@ from app.modules.documents.pdf import extract_text
 from app.modules.documents.chunk_model import DocumentChunk
 from app.modules.documents.chunking import chunk_text
 from app.modules.documents.embedding import generate_embedding
+from app.modules.documents.search import search_similar_chunks
 
 router = APIRouter()
 
@@ -66,12 +67,37 @@ def get_me(user = Depends(get_current_user)):
         "user": user
     }
 
+
+# @router.get("/search")
+# def get_documents(q: str, limit: int = 10):
+#     return {
+#         "query": q,
+#         "limit": limit
+#     }
+
 @router.get("/search")
-def get_documents(q: str, limit: int = 10):
-    return {
-        "query": q,
-        "limit": limit
-    }
+def search_documents(
+    q: str,
+    db: Session = Depends(get_db),
+):
+    query_embedding = generate_embedding(q)
+
+    results = search_similar_chunks(
+        db=db,
+        query_embedding=query_embedding,
+        limit=5,
+    )
+
+    return [
+        {
+            "id": chunk.id,
+            "document_id": chunk.document_id,
+            "chunk_index": chunk.chunk_index,
+            "content": chunk.content,
+            "distance": distance,
+        }
+        for chunk, distance in results
+    ]
 
 @router.get("/", response_model=list[DocumentResponse])
 def get_documents(db: Session = Depends(get_db)):
