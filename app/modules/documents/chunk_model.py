@@ -19,3 +19,4 @@ class DocumentChunk(Base):
     content = Column(Text, nullable=False)
 
     embedding = Column(VECTOR(384), nullable=True)
+    page_number = Column(Integer, nullable=False)
