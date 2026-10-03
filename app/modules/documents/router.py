@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends,  UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException,  UploadFile, File
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from app.core.database import get_db
@@ -166,15 +166,31 @@ def ask_document(
     )
 
     # 5. Return the chunks used as sources
+    # sources = []
+
+    # for chunk, distance in results:
+    #     sources.append(
+    #         {
+    #              "page_number": chunk.page_number,
+    #              "distance": float(distance),
+    #         }
+    #     )
+
     sources = []
+    seen_pages = set()
 
     for chunk, distance in results:
-        sources.append(
-            {
-                 "page_number": chunk.page_number,
-                 "distance": float(distance),
-            }
-        )
+      if chunk.page_number in seen_pages:
+        continue
+
+    seen_pages.add(chunk.page_number)
+
+    sources.append(
+        {
+            "page_number": chunk.page_number,
+            "distance": float(distance),
+        }
+    )
 
     return {
         "document_id": document_id,
@@ -221,3 +237,33 @@ def get_document(document_id: int):
         "description": "FastAPI notes"
     }
 
+@router.delete("/{document_id}")
+def delete_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+):
+    document = (
+        db.query(Document)
+        .filter(Document.id == document_id)
+        .first()
+    )
+
+    if document is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found",
+        )
+
+    db.query(DocumentChunk).filter(
+        DocumentChunk.document_id == document_id
+    ).delete(
+        synchronize_session=False
+    )
+
+    db.delete(document)
+    db.commit()
+
+    return {
+        "message": "Document deleted successfully",
+        "document_id": document_id,
+    }
