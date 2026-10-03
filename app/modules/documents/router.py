@@ -171,12 +171,23 @@ def get_documents(db: Session = Depends(get_db)):
     return documents
 
 @router.get("/{document_id}", response_model=DocumentResponse)
-def get_document(document_id: int):
-    return {
-        "id": document_id,
-        "title": "My PDF",
-        "description": "FastAPI notes"
-    }
+def get_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+):
+    document = (
+        db.query(Document)
+        .filter(Document.id == document_id)
+        .first()
+    )
+
+    if document is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found",
+        )
+
+    return document
 
 @router.delete("/{document_id}")
 def delete_document(
