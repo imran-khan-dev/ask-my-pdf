@@ -1,12 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException,  UploadFile, File
-from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.modules.documents.model import Document
 from app.modules.documents.schemas import (
     DocumentResponse,
 )
-from app.modules.documents.pdf import extract_text
 from app.modules.documents.chunk_model import DocumentChunk
 from app.modules.documents.chunking import chunk_text
 from app.modules.documents.embedding import generate_embedding
@@ -28,58 +26,77 @@ async def upload_document(
         content = await file.read()
         buffer.write(content)
 
-    # Extract text page by page
-    pages = extract_pages(file_path)
-
-    # Keep the complete extracted text in the document
-    extracted_text = "\n".join(
-        page["text"]
-        for page in pages
-    )
-
+    # Create the document record first
     new_document = Document(
         filename=file.filename,
         storage_path=file_path,
-        extracted_text=extracted_text,
+        processing_status="processing",
     )
 
     db.add(new_document)
     db.commit()
     db.refresh(new_document)
 
-    # Create chunks while preserving page numbers
-    chunks = []
+    try:
+        # Extract text page by page
+        pages = extract_pages(file_path)
 
-    for page in pages:
-        page_chunks = chunk_text(page["text"])
-
-        for chunk in page_chunks:
-            chunks.append(
-                {
-                    "page_number": page["page_number"],
-                    "content": chunk,
-                }
-            )
-
-    # Generate embeddings and save chunks
-    for index, chunk_data in enumerate(chunks):
-        content = chunk_data["content"]
-
-        embedding = generate_embedding(content)
-
-        document_chunk = DocumentChunk(
-            document_id=new_document.id,
-            chunk_index=index,
-            page_number=chunk_data["page_number"],
-            content=content,
-            embedding=embedding,
+        # Keep the complete extracted text in the document
+        extracted_text = "\n".join(
+            page["text"]
+            for page in pages
         )
 
-        db.add(document_chunk)
+        new_document.extracted_text = extracted_text
 
-    db.commit()
+        # Create chunks while preserving page numbers
+        chunks = []
 
-    return new_document
+        for page in pages:
+            page_chunks = chunk_text(page["text"])
+
+            for chunk in page_chunks:
+                chunks.append(
+                    {
+                        "page_number": page["page_number"],
+                        "content": chunk,
+                    }
+                )
+
+        # Generate embeddings and prepare chunks
+        for index, chunk_data in enumerate(chunks):
+            content = chunk_data["content"]
+
+            embedding = generate_embedding(content)
+
+            document_chunk = DocumentChunk(
+                document_id=new_document.id,
+                chunk_index=index,
+                page_number=chunk_data["page_number"],
+                content=content,
+                embedding=embedding,
+            )
+
+            db.add(document_chunk)
+
+        # Everything succeeded
+        new_document.processing_status = "completed"
+
+        db.commit()
+        db.refresh(new_document)
+
+        return new_document
+
+    except Exception:
+        # Remove any uncommitted database changes
+        db.rollback()
+
+        # Mark the document as failed
+        new_document.processing_status = "failed"
+
+        db.commit()
+
+        raise
 
 def get_current_user():
     return {
@@ -92,46 +109,6 @@ def get_me(user = Depends(get_current_user)):
     return {
         "user": user
     }
-
-
-# @router.get("/search")
-# def get_documents(q: str, limit: int = 10):
-#     return {
-#         "query": q,
-#         "limit": limit
-#     }
-
-# @router.get("/ask")
-# def ask_document(
-#     q: str,
-#     db: Session = Depends(get_db),
-# ):
-#     # 1. Convert the question into an embedding
-#     query_embedding = generate_embedding(q)
-
-#     # 2. Find the most relevant chunks
-#     results = search_similar_chunks(
-#         db=db,
-#         query_embedding=query_embedding,
-#         limit=5,
-#     )
-
-#     # 3. Extract only the text from each chunk
-#     chunks = []
-
-#     for chunk, distance in results:
-#         chunks.append(chunk.content)
-
-#     # 4. Send the question + retrieved chunks to Qwen
-#     answer = generate_answer(
-#         question=q,
-#         chunks=chunks,
-#     )
-
-#     return {
-#         "question": q,
-#         "answer": answer,
-#     }
 
 @router.get("/{document_id}/ask")
 def ask_document(
@@ -164,17 +141,6 @@ def ask_document(
         question=q,
         chunks=chunks,
     )
-
-    # 5. Return the chunks used as sources
-    # sources = []
-
-    # for chunk, distance in results:
-    #     sources.append(
-    #         {
-    #              "page_number": chunk.page_number,
-    #              "distance": float(distance),
-    #         }
-    #     )
 
     sources = []
     seen_pages = set()
