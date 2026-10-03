@@ -11,6 +11,8 @@ from app.modules.documents.embedding import generate_embedding
 from app.modules.documents.search import search_similar_chunks
 from app.modules.documents.llm import generate_answer
 from app.modules.documents.pdf import extract_pages
+from app.modules.documents.processing import process_document
+
 
 router = APIRouter()
 
@@ -26,7 +28,7 @@ async def upload_document(
         content = await file.read()
         buffer.write(content)
 
-    # Create the document record first
+    # Create the document record
     new_document = Document(
         filename=file.filename,
         storage_path=file_path,
@@ -37,66 +39,13 @@ async def upload_document(
     db.commit()
     db.refresh(new_document)
 
-    try:
-        # Extract text page by page
-        pages = extract_pages(file_path)
+    # Process the document
+    process_document(
+        document=new_document,
+        db=db,
+    )
 
-        # Keep the complete extracted text in the document
-        extracted_text = "\n".join(
-            page["text"]
-            for page in pages
-        )
-
-        new_document.extracted_text = extracted_text
-
-        # Create chunks while preserving page numbers
-        chunks = []
-
-        for page in pages:
-            page_chunks = chunk_text(page["text"])
-
-            for chunk in page_chunks:
-                chunks.append(
-                    {
-                        "page_number": page["page_number"],
-                        "content": chunk,
-                    }
-                )
-
-        # Generate embeddings and prepare chunks
-        for index, chunk_data in enumerate(chunks):
-            content = chunk_data["content"]
-
-            embedding = generate_embedding(content)
-
-            document_chunk = DocumentChunk(
-                document_id=new_document.id,
-                chunk_index=index,
-                page_number=chunk_data["page_number"],
-                content=content,
-                embedding=embedding,
-            )
-
-            db.add(document_chunk)
-
-        # Everything succeeded
-        new_document.processing_status = "completed"
-
-        db.commit()
-        db.refresh(new_document)
-
-        return new_document
-
-    except Exception:
-        # Remove any uncommitted database changes
-        db.rollback()
-
-        # Mark the document as failed
-        new_document.processing_status = "failed"
-
-        db.commit()
-
-        raise
+    return new_document
 
 def get_current_user():
     return {

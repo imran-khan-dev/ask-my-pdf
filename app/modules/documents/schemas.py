@@ -6,7 +6,7 @@ class DocumentResponse(BaseModel):
     id: int
     filename: str
     storage_path: str
-    extracted_text: str
+    extracted_text: str | None = None
     processing_status: str
     created_at: datetime
 
