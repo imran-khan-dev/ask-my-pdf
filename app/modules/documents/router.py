@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException,  UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException,  UploadFile, File, BackgroundTasks
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.modules.documents.model import Document
@@ -18,6 +18,7 @@ router = APIRouter()
 
 @router.post("/upload", response_model=DocumentResponse)
 async def upload_document(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
@@ -40,9 +41,10 @@ async def upload_document(
     db.refresh(new_document)
 
     # Process the document
-    process_document(
-        document=new_document,
-        db=db,
+    background_tasks.add_task(
+    process_document,
+    document=new_document,
+    db=db,
     )
 
     return new_document
@@ -65,6 +67,31 @@ def ask_document(
     q: str,
     db: Session = Depends(get_db),
 ):
+
+    document = (
+        db.query(Document)
+        .filter(Document.id == document_id)
+        .first()
+    )
+
+    if document is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found",
+        )
+
+    if document.processing_status == "processing":
+        raise HTTPException(
+            status_code=409,
+            detail="Document is still being processed",
+        )
+
+    if document.processing_status == "failed":
+        raise HTTPException(
+            status_code=500,
+            detail="Document processing failed",
+        )
+
     # 1. Generate embedding for the question
     query_embedding = generate_embedding(q)
 
@@ -95,17 +122,17 @@ def ask_document(
     seen_pages = set()
 
     for chunk, distance in results:
-      if chunk.page_number in seen_pages:
-        continue
+        if chunk.page_number in seen_pages:
+            continue
 
-    seen_pages.add(chunk.page_number)
+        seen_pages.add(chunk.page_number)
 
-    sources.append(
-        {
-            "page_number": chunk.page_number,
-            "distance": float(distance),
-        }
-    )
+        sources.append(
+            {
+                "page_number": chunk.page_number,
+                "distance": float(distance),
+            }
+        )
 
     return {
         "document_id": document_id,
