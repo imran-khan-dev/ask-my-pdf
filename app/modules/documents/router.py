@@ -43,9 +43,8 @@ async def upload_document(
     # Process the document
     background_tasks.add_task(
     process_document,
-    document=new_document,
-    db=db,
-    )
+    new_document.id,
+)
 
     return new_document
 

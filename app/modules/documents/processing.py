@@ -1,17 +1,25 @@
-from sqlalchemy.orm import Session
-
 from app.modules.documents.model import Document
 from app.modules.documents.chunk_model import DocumentChunk
 from app.modules.documents.pdf import extract_pages
 from app.modules.documents.chunking import chunk_text
 from app.modules.documents.embedding import generate_embedding
+from app.core.database import SessionLocal
 
 
-def process_document(
-    document: Document,
-    db: Session,
-):
+def process_document(document_id: int):
+    db = SessionLocal()
+
     try:
+        # Fetch the document using the background task's own DB session
+        document = (
+            db.query(Document)
+            .filter(Document.id == document_id)
+            .first()
+        )
+
+        if document is None:
+            return
+
         # Extract text page by page
         pages = extract_pages(document.storage_path)
 
@@ -64,8 +72,18 @@ def process_document(
         db.rollback()
 
         # Mark the document as failed
-        document.processing_status = "failed"
+        document = (
+            db.query(Document)
+            .filter(Document.id == document_id)
+            .first()
+        )
 
-        db.commit()
+        if document is not None:
+            document.processing_status = "failed"
+            db.commit()
 
         raise
+
+    finally:
+        # Always close this background task's DB session
+        db.close()
