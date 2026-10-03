@@ -23,6 +23,9 @@ def process_document(document_id: int):
         # Extract text page by page
         pages = extract_pages(document.storage_path)
 
+        if not pages:
+            raise ValueError("No readable text found in document")
+
         # Keep the complete extracted text in the document
         extracted_text = "\n".join(
             page["text"]
