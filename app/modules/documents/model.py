@@ -11,4 +11,9 @@ class Document(Base):
     filename = Column(String, nullable=False)
     storage_path = Column(String, nullable=False)
     extracted_text = Column(String, nullable=True)
+    processing_status = Column(
+        String,
+        nullable=False,
+        default="processing",
+    )
     created_at = Column(DateTime(timezone=True), server_default=func.now())

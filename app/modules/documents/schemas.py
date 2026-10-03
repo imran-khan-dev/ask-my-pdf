@@ -7,6 +7,7 @@ class DocumentResponse(BaseModel):
     filename: str
     storage_path: str
     extracted_text: str
+    processing_status: str
     created_at: datetime
 
     model_config = {

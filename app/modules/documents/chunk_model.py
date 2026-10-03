@@ -9,10 +9,13 @@ class DocumentChunk(Base):
     id = Column(Integer, primary_key=True, index=True)
 
     document_id = Column(
-        Integer,
-        ForeignKey("documents.id"),
-        nullable=False,
-    )
+    Integer,
+    ForeignKey(
+        "documents.id",
+        ondelete="CASCADE"
+    ),
+    nullable=False
+)
 
     chunk_index = Column(Integer, nullable=False)
 

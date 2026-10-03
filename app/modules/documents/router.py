@@ -254,12 +254,6 @@ def delete_document(
             detail="Document not found",
         )
 
-    db.query(DocumentChunk).filter(
-        DocumentChunk.document_id == document_id
-    ).delete(
-        synchronize_session=False
-    )
-
     db.delete(document)
     db.commit()
 
