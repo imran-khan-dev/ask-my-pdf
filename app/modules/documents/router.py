@@ -154,7 +154,10 @@ def ask_document(
     chunks = []
 
     for chunk, distance in results:
-        chunks.append(chunk.content)
+        chunks.append({
+            "page_number": chunk.page_number,
+            "content": chunk.content,
+        })
 
     # 4. Generate the answer
     answer = generate_answer(
@@ -168,11 +171,8 @@ def ask_document(
     for chunk, distance in results:
         sources.append(
             {
-                "chunk_id": chunk.id,
-                "chunk_index": chunk.chunk_index,
-                "distance": float(distance),
-                "content": chunk.content,
-                "page_number": chunk.page_number,
+                 "page_number": chunk.page_number,
+                 "distance": float(distance),
             }
         )
 
