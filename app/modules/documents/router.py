@@ -12,7 +12,13 @@ from app.modules.documents.search import search_similar_chunks
 from app.modules.documents.llm import generate_answer
 from app.modules.documents.pdf import extract_pages
 from app.modules.documents.processing import process_document
+from pathlib import Path
+import uuid
 
+
+UPLOAD_DIR = Path("uploads")
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+UPLOAD_DIR.mkdir(exist_ok=True)
 
 router = APIRouter()
 
@@ -22,29 +28,74 @@ async def upload_document(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
-    file_path = f"uploads/{file.filename}"
+    # 1. Validate content type
+    if file.content_type != "application/pdf":
+        raise HTTPException(
+            status_code=400,
+            detail="Only PDF files are allowed",
+        )
 
-    # Save the uploaded PDF
-    with open(file_path, "wb") as buffer:
-        content = await file.read()
-        buffer.write(content)
+    # 2. Read the uploaded file
+    content = await file.read()
 
-    # Create the document record
+    # 3. Validate file size
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail="File size must be 10 MB or less",
+        )
+
+    # 4. Validate PDF file signature
+    if not content.startswith(b"%PDF"):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid PDF file",
+        )
+
+    # 5. Generate a safe unique filename
+    original_filename = Path(file.filename or "document.pdf").name
+
+    unique_filename = (
+        f"{uuid.uuid4()}_{original_filename}"
+    )
+
+    file_path = UPLOAD_DIR / unique_filename
+
+    # 6. Save the file
+    try:
+        with open(file_path, "wb") as buffer:
+            buffer.write(content)
+
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to save uploaded file",
+        )
+
+    # 7. Create document record
     new_document = Document(
-        filename=file.filename,
-        storage_path=file_path,
+        filename=original_filename,
+        storage_path=str(file_path),
         processing_status="processing",
     )
 
-    db.add(new_document)
-    db.commit()
-    db.refresh(new_document)
+    try:
+        db.add(new_document)
+        db.commit()
+        db.refresh(new_document)
 
-    # Process the document
+    except Exception:
+        db.rollback()
+
+        if file_path.exists():
+            file_path.unlink()
+        raise
+
+    # 8. Process in background
     background_tasks.add_task(
-    process_document,
-    new_document.id,
-)
+        process_document,
+        new_document.id,
+    )
 
     return new_document
 
@@ -206,8 +257,25 @@ def delete_document(
             detail="Document not found",
         )
 
-    db.delete(document)
-    db.commit()
+    file_path = Path(document.storage_path)
+
+    try:
+        db.delete(document)
+        db.commit()
+
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to delete document",
+        )
+
+    # Delete physical file after DB deletion succeeds
+    if file_path.exists():
+        try:
+            file_path.unlink()
+        except OSError:
+            pass
 
     return {
         "message": "Document deleted successfully",
