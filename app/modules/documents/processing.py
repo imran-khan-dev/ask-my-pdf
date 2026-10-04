@@ -4,6 +4,7 @@ from app.modules.documents.pdf import extract_pages
 from app.modules.documents.chunking import chunk_text
 from app.modules.documents.embedding import generate_embedding
 from app.core.database import SessionLocal
+import os
 
 
 def process_document(document_id: int):
@@ -84,7 +85,9 @@ def process_document(document_id: int):
         if document is not None:
             document.processing_status = "failed"
             db.commit()
-
+        # Delete the uploaded file
+        if os.path.exists(document.storage_path):
+            os.remove(document.storage_path)
         raise
 
     finally:
