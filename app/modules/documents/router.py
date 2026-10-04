@@ -5,16 +5,13 @@ from app.modules.documents.model import Document
 from app.modules.documents.schemas import (
     DocumentResponse,
 )
-from app.modules.documents.chunk_model import DocumentChunk
-from app.modules.documents.chunking import chunk_text
 from app.modules.documents.embedding import generate_embedding
 from app.modules.documents.search import search_similar_chunks
-from app.modules.documents.llm import generate_answer
-from app.modules.documents.pdf import extract_pages
 from app.modules.documents.processing import process_document
 from pathlib import Path
 import uuid
-
+from app.modules.documents.rag import ask_document as run_rag
+from app.modules.documents.schemas import AskResponse
 
 UPLOAD_DIR = Path("uploads")
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
@@ -111,13 +108,12 @@ def get_me(user = Depends(get_current_user)):
         "user": user
     }
 
-@router.get("/{document_id}/ask")
+@router.get("/{document_id}/ask", response_model=AskResponse)
 def ask_document(
     document_id: int,
     q: str,
     db: Session = Depends(get_db),
 ):
-
     document = (
         db.query(Document)
         .filter(Document.id == document_id)
@@ -142,54 +138,17 @@ def ask_document(
             detail="Document processing failed",
         )
 
-    # 1. Generate embedding for the question
-    query_embedding = generate_embedding(q)
-
-    # 2. Retrieve the most relevant chunks
-    results = search_similar_chunks(
-        db=db,
-        query_embedding=query_embedding,
-        document_id=document_id,
-        limit=5,
-    )
-
-    # 3. Extract chunk text for the LLM
-    chunks = []
-
-    for chunk, distance in results:
-        chunks.append({
-            "page_number": chunk.page_number,
-            "content": chunk.content,
-        })
-
-    # 4. Generate the answer
-    answer = generate_answer(
-        question=q,
-        chunks=chunks,
-    )
-
-    sources = []
-    seen_pages = set()
-
-    for chunk, distance in results:
-        if chunk.page_number in seen_pages:
-            continue
-
-        seen_pages.add(chunk.page_number)
-
-        sources.append(
-            {
-                "page_number": chunk.page_number,
-                "distance": float(distance),
-            }
+    if not q.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Question cannot be empty",
         )
 
-    return {
-        "document_id": document_id,
-        "question": q,
-        "answer": answer,
-        "sources": sources,
-    }
+    return run_rag(
+        db=db,
+        document_id=document_id,
+        question=q,
+    )
 
 @router.get("/search")
 def search_documents(
