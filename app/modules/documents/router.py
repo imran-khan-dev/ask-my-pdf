@@ -1,23 +1,36 @@
-from fastapi import APIRouter, Depends, HTTPException,  UploadFile, File, BackgroundTasks
+import logging
+import uuid
+from pathlib import Path
+
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    HTTPException,
+    UploadFile,
+)
 from sqlalchemy.orm import Session
+
 from app.core.database import get_db
 from app.modules.documents.model import Document
+from app.modules.documents.processing import process_document
+from app.modules.documents.rag import ask_document as run_rag
 from app.modules.documents.schemas import (
+    AskResponse,
     DocumentResponse,
 )
-from app.modules.documents.embedding import generate_embedding
-from app.modules.documents.search import search_similar_chunks
-from app.modules.documents.processing import process_document
-from pathlib import Path
-import uuid
-from app.modules.documents.rag import ask_document as run_rag
-from app.modules.documents.schemas import AskResponse
+
+
+logger = logging.getLogger(__name__)
 
 UPLOAD_DIR = Path("uploads")
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+
 UPLOAD_DIR.mkdir(exist_ok=True)
 
 router = APIRouter()
+
 
 @router.post("/upload", response_model=DocumentResponse)
 async def upload_document(
@@ -50,7 +63,9 @@ async def upload_document(
         )
 
     # 5. Generate a safe unique filename
-    original_filename = Path(file.filename or "document.pdf").name
+    original_filename = Path(
+        file.filename or "document.pdf"
+    ).name
 
     unique_filename = (
         f"{uuid.uuid4()}_{original_filename}"
@@ -64,6 +79,11 @@ async def upload_document(
             buffer.write(content)
 
     except Exception:
+        logger.exception(
+            "Failed to save uploaded file: filename=%s",
+            original_filename,
+        )
+
         raise HTTPException(
             status_code=500,
             detail="Failed to save uploaded file",
@@ -82,11 +102,20 @@ async def upload_document(
         db.refresh(new_document)
 
     except Exception:
+        logger.exception(
+            "Failed to create document record: filename=%s",
+            original_filename,
+        )
+
         db.rollback()
 
         if file_path.exists():
             file_path.unlink()
-        raise
+
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to create document",
+        )
 
     # 8. Process in background
     background_tasks.add_task(
@@ -96,17 +125,6 @@ async def upload_document(
 
     return new_document
 
-def get_current_user():
-    return {
-        "id": 1,
-        "name": "Imran"
-    }
-
-@router.get("/me")
-def get_me(user = Depends(get_current_user)):
-    return {
-        "user": user
-    }
 
 @router.get("/{document_id}/ask", response_model=AskResponse)
 def ask_document(
@@ -150,35 +168,15 @@ def ask_document(
         question=q,
     )
 
-@router.get("/search")
-def search_documents(
-    q: str,
-    db: Session = Depends(get_db),
-):
-    query_embedding = generate_embedding(q)
-
-    results = search_similar_chunks(
-        db=db,
-        query_embedding=query_embedding,
-        limit=5,
-    )
-
-    return [
-        {
-            "id": chunk.id,
-            "document_id": chunk.document_id,
-            "chunk_index": chunk.chunk_index,
-            "content": chunk.content,
-            "distance": distance,
-        }
-        for chunk, distance in results
-    ]
 
 @router.get("/", response_model=list[DocumentResponse])
-def get_documents(db: Session = Depends(get_db)):
+def get_documents(
+    db: Session = Depends(get_db),
+):
     documents = db.query(Document).all()
 
     return documents
+
 
 @router.get("/{document_id}", response_model=DocumentResponse)
 def get_document(
@@ -198,6 +196,7 @@ def get_document(
         )
 
     return document
+
 
 @router.delete("/{document_id}")
 def delete_document(
@@ -223,7 +222,13 @@ def delete_document(
         db.commit()
 
     except Exception:
+        logger.exception(
+            "Failed to delete document: document_id=%s",
+            document_id,
+        )
+
         db.rollback()
+
         raise HTTPException(
             status_code=500,
             detail="Failed to delete document",
@@ -233,8 +238,12 @@ def delete_document(
     if file_path.exists():
         try:
             file_path.unlink()
+
         except OSError:
-            pass
+            logger.exception(
+                "Failed to delete document file: document_id=%s",
+                document_id,
+            )
 
     return {
         "message": "Document deleted successfully",
