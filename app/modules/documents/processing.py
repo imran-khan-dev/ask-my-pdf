@@ -21,6 +21,9 @@ def process_document(document_id: int):
         if document is None:
             return
 
+        if document.processing_status != "processing":
+         return
+        
         # Extract text page by page
         pages = extract_pages(document.storage_path)
 
