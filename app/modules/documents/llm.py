@@ -1,5 +1,5 @@
 from ollama import chat
-
+from app.core.config import OLLAMA_MODEL
 
 def generate_answer(
     question: str,
@@ -44,7 +44,7 @@ Question:
 """
 
     response = chat(
-        model="qwen3:4b",
+        model=OLLAMA_MODEL,
         messages=[
             {
                 "role": "user",

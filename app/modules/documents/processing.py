@@ -86,10 +86,10 @@ def process_document(document_id: int):
         )
 
         if document is not None:
-            document.processing_status = "failed"
-            db.commit()
-        # Delete the uploaded file
-        if os.path.exists(document.storage_path):
+          document.processing_status = "failed"
+          db.commit()
+          
+          if os.path.exists(document.storage_path):
             os.remove(document.storage_path)
         raise
 
