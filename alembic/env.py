@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 from app.core.database import Base
 from app.modules.documents.model import Document
-from app.modules.documents.chunk_model import DocumentChunk
+from app.modules.rag.chunk_model import DocumentChunk
 
 
 # this is the Alembic Config object, which provides

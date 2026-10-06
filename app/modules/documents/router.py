@@ -14,13 +14,10 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.modules.documents.model import Document
-from app.modules.documents.processing import process_document
-from app.modules.documents.rag import ask_document as run_rag
+from app.modules.documents.service import process_document
 from app.modules.documents.schemas import (
-    AskResponse,
     DocumentResponse,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -125,50 +122,6 @@ async def upload_document(
 
     return new_document
 
-
-@router.get("/{document_id}/ask", response_model=AskResponse)
-def ask_document(
-    document_id: int,
-    q: str,
-    db: Session = Depends(get_db),
-):
-    document = (
-        db.query(Document)
-        .filter(Document.id == document_id)
-        .first()
-    )
-
-    if document is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Document not found",
-        )
-
-    if document.processing_status == "processing":
-        raise HTTPException(
-            status_code=409,
-            detail="Document is still being processed",
-        )
-
-    if document.processing_status == "failed":
-        raise HTTPException(
-            status_code=500,
-            detail="Document processing failed",
-        )
-
-    if not q.strip():
-        raise HTTPException(
-            status_code=400,
-            detail="Question cannot be empty",
-        )
-
-    return run_rag(
-        db=db,
-        document_id=document_id,
-        question=q,
-    )
-
-
 @router.get("/", response_model=list[DocumentResponse])
 def get_documents(
     db: Session = Depends(get_db),
@@ -176,7 +129,6 @@ def get_documents(
     documents = db.query(Document).all()
 
     return documents
-
 
 @router.get("/{document_id}", response_model=DocumentResponse)
 def get_document(
@@ -196,7 +148,6 @@ def get_document(
         )
 
     return document
-
 
 @router.delete("/{document_id}")
 def delete_document(

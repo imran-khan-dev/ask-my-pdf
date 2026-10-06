@@ -1,8 +1,7 @@
 from sqlalchemy.orm import Session
-
-from app.modules.documents.embedding import generate_embedding
-from app.modules.documents.search import search_similar_chunks
-from app.modules.documents.llm import generate_answer
+from app.modules.ai.embedding import generate_embedding
+from app.modules.rag.retrieval import search_similar_chunks
+from app.modules.ai.llm import generate_answer
 
 
 def ask_document(
