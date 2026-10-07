@@ -8,13 +8,13 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.modules.documents.model import Document
 from app.modules.rag.service import ask_document as run_rag
-from app.modules.documents.schemas import (
+from app.modules.rag.schemas import (
     AskResponse,
 )
 
 router = APIRouter()
 
-@router.get("/{document_id}/ask", response_model=AskResponse)
+@router.get("/documents/{document_id}/ask", response_model=AskResponse)
 def ask_document(
     document_id: int,
     q: str,

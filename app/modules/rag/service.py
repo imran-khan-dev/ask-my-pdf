@@ -9,10 +9,10 @@ def ask_document(
     document_id: int,
     question: str,
 ):
-    # 1. Generate embedding for the question
+    # Generate embedding for the question
     query_embedding = generate_embedding(question)
 
-    # 2. Retrieve relevant chunks
+    # Retrieve relevant chunks
     results = search_similar_chunks(
         db=db,
         query_embedding=query_embedding,
@@ -20,7 +20,7 @@ def ask_document(
         limit=5,
     )
 
-    # 3. No relevant chunks found
+    # No relevant chunks found
     if not results:
         return {
             "document_id": document_id,
@@ -29,7 +29,7 @@ def ask_document(
             "sources": [],
         }
 
-    # 4. Prepare chunks for the LLM
+    # Prepare chunks for the LLM
     chunks = []
 
     for chunk, distance in results:
@@ -40,13 +40,13 @@ def ask_document(
             }
         )
 
-    # 5. Generate grounded answer
+    # Generate grounded answer
     answer = generate_answer(
         question=question,
-        chunks=chunks,
+        context=chunks,
     )
 
-    # 6. Build unique page sources
+    # Build unique page sources
     sources = []
     seen_pages = set()
 

@@ -6,9 +6,6 @@ from app.core.config import (
 )
 
 
-client = OpenAI(api_key=OPENAI_API_KEY)
-
-
 def generate_answer(
     question: str,
     context: str,
@@ -36,7 +33,7 @@ Context:
 Question:
 {question}
 """
-
+    client = OpenAI(api_key=OPENAI_API_KEY)
     response = client.chat.completions.create(
         model=OPENAI_LLM_MODEL,
         messages=[

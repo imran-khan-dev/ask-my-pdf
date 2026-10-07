@@ -1,7 +1,6 @@
 import logging
 import uuid
 from pathlib import Path
-
 from fastapi import (
     APIRouter,
     BackgroundTasks,
@@ -11,7 +10,6 @@ from fastapi import (
     UploadFile,
 )
 from sqlalchemy.orm import Session
-
 from app.core.database import get_db
 from app.modules.documents.model import Document
 from app.modules.documents.service import process_document
@@ -28,38 +26,37 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 
 router = APIRouter()
 
-
 @router.post("/upload", response_model=DocumentResponse)
 async def upload_document(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
-    # 1. Validate content type
+    # Validate content type
     if file.content_type != "application/pdf":
         raise HTTPException(
             status_code=400,
             detail="Only PDF files are allowed",
         )
 
-    # 2. Read the uploaded file
+    # Read the uploaded file
     content = await file.read()
 
-    # 3. Validate file size
+    # Validate file size
     if len(content) > MAX_FILE_SIZE:
         raise HTTPException(
             status_code=413,
             detail="File size must be 10 MB or less",
         )
 
-    # 4. Validate PDF file signature
+    # Validate PDF file signature
     if not content.startswith(b"%PDF"):
         raise HTTPException(
             status_code=400,
             detail="Invalid PDF file",
         )
 
-    # 5. Generate a safe unique filename
+    # Generate a safe unique filename
     original_filename = Path(
         file.filename or "document.pdf"
     ).name
@@ -70,7 +67,7 @@ async def upload_document(
 
     file_path = UPLOAD_DIR / unique_filename
 
-    # 6. Save the file
+    # Save the file
     try:
         with open(file_path, "wb") as buffer:
             buffer.write(content)
@@ -86,7 +83,7 @@ async def upload_document(
             detail="Failed to save uploaded file",
         )
 
-    # 7. Create document record
+    # Create document record
     new_document = Document(
         filename=original_filename,
         storage_path=str(file_path),
@@ -114,7 +111,7 @@ async def upload_document(
             detail="Failed to create document",
         )
 
-    # 8. Process in background
+    # Process in background
     background_tasks.add_task(
         process_document,
         new_document.id,

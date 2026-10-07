@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from app.modules.documents.router import router as documents_router
 from fastapi.middleware.cors import CORSMiddleware
+from app.modules.rag.router import router as rag_router
 
 app = FastAPI()
 
@@ -21,7 +22,12 @@ def home():
 
 app.include_router(
     documents_router,
-    prefix="/documents"
+    prefix="/documents",
+)
+
+app.include_router(
+    rag_router,
+    
 )
 
 # uvicorn main:app --reload

@@ -166,5 +166,5 @@ def process_document(document_id: int):
         raise
 
     finally:
-        # Always close this background task's DB session
+        # Close this background task's DB session
         db.close()
